@@ -4,8 +4,10 @@ import java.net.*;
 //Nimai and shashanth edited this — added Kafka messaging imports
 import messaging.MessageQueue;
 import model.Message;
+import observers.Observers;
+import subject.Subject;
 
-public class Server {
+public class Server implements Subject {
 
     public static void main(String[] args) throws Exception {
 
@@ -40,4 +42,26 @@ public class Server {
             }
         }
     }
+
+// overrides for Subject observers (Tylissa)
+    private List<Observers> observers = new ArrayList<>();
+    private String message = "";
+
+    @Override
+    public void addObserver(Observers observer) {
+        observers.add(observer);
+    }
+
+    @Override
+    public void removeObserver(Observers observer) {
+        observers.remove(observer);
+    }
+
+    @Override
+    public void notifyObservers() {
+        for (Observers observer : observers) {
+            observer.update(message);
+        }
+    }
+
 }
