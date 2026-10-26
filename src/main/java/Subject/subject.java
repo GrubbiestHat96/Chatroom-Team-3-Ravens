@@ -1,12 +1,12 @@
-package subject;
+package Subject;
 
-import observers.Observers;
+import observers.Observer;
 
 public interface Subject {
 
-    void addObserver(Observers observer);
+    void addObserver(Observer observer);
 
-    void removeObserver(Observers observer);
+    void removeObserver(Observer observer);
 
     void notifyObservers();
 }

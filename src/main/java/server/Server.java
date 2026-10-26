@@ -1,13 +1,15 @@
-import java.io.*;
-import java.net.*;
+package server;
 
-//Nimai and shashanth edited this — added Kafka messaging imports
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.ServerSocket;
+import java.net.Socket;
+
 import messaging.MessageQueue;
 import model.Message;
-import observers.Observers;
-import subject.Subject;
 
-public class Server implements Subject {
+public class Server {
 
     public static void main(String[] args) throws Exception {
 
@@ -43,25 +45,26 @@ public class Server implements Subject {
         }
     }
 
-// overrides for Subject observers (Tylissa)
-    private List<Observers> observers = new ArrayList<>();
-    private String message = "";
-
-    @Override
-    public void addObserver(Observers observer) {
-        observers.add(observer);
+    void send(Message message) {
+        // Logic to send a message to the database
+        System.out.println("Sending message to database: " + message);
     }
 
-    @Override
-    public void removeObserver(Observers observer) {
-        observers.remove(observer);
-    }
 
-    @Override
-    public void notifyObservers() {
-        for (Observers observer : observers) {
-            observer.update(message);
+
+    void receive(Message message) {
+        // Logic to send a message to the database
+        
+        if (message != null) {
+            // Notify observers about the update
+           // notifyObservers(message);
         }
+
+        System.out.println("Sending message to database: " + message);
     }
+
+
+
+
 
 }
