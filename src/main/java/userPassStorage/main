@@ -1,0 +1,203 @@
+package testing;
+import java.util.HashMap;
+import java.util.Scanner;
+/*things to add:
+ * + new account creation and storage
+ * + prompt user to relogin after account creation
+ * + login 
+ * 		- tell the user their username (if their username doesn't exist, prompt them to make a new account)
+ * 		- the the user their password is incorrect (if the username exists)
+ * x append a number to a user's name if their username already exists
+ */
+public class Main {
+	public static String user;
+	public static String name;
+	public static boolean valid;
+	public static String passwrd;
+
+	public static boolean  numbCheck;
+	public static boolean  upperCheck;
+	public static boolean  specialCheck;
+	public static boolean  space;
+	public static boolean  lengthCheck;
+	public static int count = 1;
+
+	public static Scanner keybd = new Scanner(System.in);
+	public static HashMap<String, String> storage = new HashMap<String, String>();
+
+	public static void main(String[] args) {
+		boolean running = true;
+		while(running) {
+			System.out.print("Are you a new user? (yes/no)  "); //will be buttons later on
+
+			if(keybd.nextLine().toLowerCase().equals("yes")){
+				newUser();
+				System.out.println("Please log in again.");
+				login();
+
+			} else if(keybd.nextLine().toLowerCase().equals("no")) {
+				login();
+				running = false;
+			} else { //section for testing purposes
+				System.out.println("Not a valid response.");
+				running = true;
+			}
+		}
+	}
+
+	public static void newUser() {
+		System.out.println("Create a username");
+		System.out.print("Enter your first and last name separated by a space: ");
+
+		//username based on the user's first and last name
+		name = keybd.nextLine();
+		String[] parts = name.split("\\s+",2);
+
+		//username maxes out at 16 characters long
+		if(parts[1].length() > 15) {
+			char first = parts[0].charAt(0);
+			String last = parts[1].substring(0,14);
+			user = first + last;
+		} else {
+			char first = parts[0].charAt(0);
+			user = first + parts[1];
+		}
+
+		//does this username already exist? add a number
+		if(storage.containsKey(user)) {
+			for(String u : storage.keySet()) {
+				String[] result = u.split("\\d+");
+				if(user.equals(result[0])) {
+					count ++;
+				}
+			}
+			user = user.concat(Integer.toString(count));
+			count = 1;
+		}
+		
+		System.out.println("Your username is: " + user + "\n");
+
+		System.out.println("Now enter a password.");
+		System.out.println("The password must:\n"
+				+ "1. Be 8 characters in length\n"
+				+ "2. Have a captial letter\n"
+				+ "3. Have at least one number\n"
+				+ "4. Have at least one special character\n");
+
+		if(storage.get(user) == null) {
+			valid = false;
+		}
+		
+		while(valid == false) {
+			//resets values back to false after every user login
+			lengthCheck = false;
+		    numbCheck = false;
+		    upperCheck = false;
+		    specialCheck = false;
+		    space = false;
+		    
+			System.out.print( "Enter your password: ");
+			passwrd = keybd.nextLine();
+
+			//determines if the password is valid
+			if(passwrd.length() >= 8) {
+				lengthCheck = true;
+			}
+
+			for(int i = 0; i < passwrd.length(); i++) {
+				char c = passwrd.charAt(i);
+				if(Character.isDigit(c)) {
+					numbCheck = true;
+				} else if (Character.isUpperCase(c)) {
+					upperCheck = true;
+				}else if (!Character.isLetterOrDigit(c)) {
+					specialCheck = true;
+				} else if (Character.isWhitespace(c)) { // can't have a space in a password
+					space = true;
+				} else {
+
+				}
+
+			}
+
+			//makes sure the password meets all reqs
+			if (numbCheck == true && upperCheck == true && specialCheck == true && lengthCheck == true && space != true) {
+				valid = true;
+				System.out.println ("Password successfully saved.\n");
+				storage.put(user, passwrd);
+			} else {
+				System.out.println("Password did not meet one of the requirements.");
+				if(numbCheck == false) {
+					System.out.println("[x] Number");
+				}
+
+				if(upperCheck == false) {
+					System.out.println("[x] Uppercase letter");
+				}
+
+				if(specialCheck == false) {
+					System.out.println("[x] Special charatcer");
+				}
+
+				if(lengthCheck == false) {
+					System.out.println("[x] Length 8 characters or more");
+				}
+
+				if(space == true) {
+					System.out.println("No spaces are allowed in your password");
+				}
+			}
+		}
+		//call client class and make a new client thingy (like new CLient(username) or whatever)
+	}
+
+	public static void login() {
+		boolean login = false;
+		boolean failed = false;
+		int attempts = 0; //3 attempts before softlock
+
+		String checkUser = "";
+		String checkPassword = "";
+
+		while(login == false && failed == false) {
+			System.out.print("Enter your username: ");
+			checkUser = keybd.nextLine();
+			//check if the username exists
+			for(String user : storage.keySet()) {
+				if(storage.containsKey(user)) {
+					//password checker
+					//3 attempts before a login fails
+					while(attempts < 3 && login == false) {
+						System.out.print("Enter your password: ");
+						checkPassword = keybd.nextLine();
+
+						if(storage.get(checkUser).equals(checkPassword)) {
+							System.out.println("Login successful.");
+							login = true;
+							System.out.println(storage);
+						} else {
+							System.out.println("Incorrect password. Please try again.");
+							attempts ++;
+						}
+
+						if(attempts == 3) {
+							System.out.println("Login failed");
+							failed = true;
+						}
+					}
+				} else {
+					System.out.print("The username you entered does not exist.\n "
+							+ "Do you wish to create an account? (yes/no):   ");
+					if(keybd.nextLine().toLowerCase().equals("yes")) {
+						newUser();
+					} else {
+						attempts = 3;
+						System.out.println("Have a good day");
+					}
+				}
+			}
+		}
+
+	}
+}
+
