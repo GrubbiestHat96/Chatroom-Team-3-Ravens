@@ -1,10 +1,17 @@
-import java.io.*;
-import java.net.*;
-import java.util.*;
 
-//Nimai and shashanth edited this — added Kafka messaging imports
+
+package server;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Scanner;
+import java.util.StringTokenizer;
+import java.util.Vector;
+
 import messaging.MessageQueue;
-import model.Message;
 
 public class Server {
 	//tylissa: vector to store active clients and counter for clients
@@ -20,41 +27,14 @@ public class Server {
             System.out.println("Waiting for client");
 
             //Nimai and shashanth edited this — read client messages using UTF-8
-            try (
+            while (true) {
                 Socket socket = server.accept();
-                BufferedReader input = new BufferedReader(
-                    new InputStreamReader(
-                        socket.getInputStream(),
-                        java.nio.charset.StandardCharsets.UTF_8
-                    )
-                )
-            ) {
-                System.out.println("Client connected");
-		//tylissa: input/output streams for messages
-		DataInputStream input = new DataInputStream(socket.getInputStream());
-		DataOutputStream output = new DataOutputStream(socket.getOutputStream());
-
-		/* tylissa:
-		*creating a client handler + new thread,  then adding them to the active
-		* client list. the thread is then started
-		* "client " + counter will be replaced with their username
-		*/
-		clientHandler handler = new clientHandler(socket, "client " + counter, input, output);
-		Thread t = new Thread(handler);
-		active.add(handler);
-		t.start;
-		counter++;
-                //Nimai and shashanth edited this — forward client messages to Kafka
-                String text;
-
-                while ((text = input.readLine()) != null) {
-                    System.out.println("Client: " + text);
-
-                    Message message = new Message("Client", text);
-                    queue.sendMessage(message);
-                }
-			
-
+                DataInputStream input = new DataInputStream(socket.getInputStream());
+                DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+                clientHandler handler = new clientHandler(socket, "client " + counter, input, output, queue);
+                active.add(handler);
+                new Thread(handler).start();
+                counter++;
             }
         }
     }
@@ -66,20 +46,36 @@ class clientHandler implements Runnable{
 	private String username;
 	final DataInputStream input;
 	final DataOutputStream output;
+	final MessageQueue queue;
 	Socket socket;
 	boolean loggedIn;
 
-	public clientHandler(Socket socket, String username, DataInputSteam input, DataOutputStream output){
+	public clientHandler(Socket socket, String username, DataInputStream input, DataOutputStream output, MessageQueue queue){
 		this.input = input;
 		this.output  = output;
 		this.username = username;
 		this.socket = socket;
 		this.loggedIn = true;
+		this.queue = queue;
 	}
+
+    private void send(String text) throws IOException {
+        synchronized (output) {
+            output.writeUTF(text);
+            output.flush();
+        }
+    }
 
 @Override
 	public void run(){
 		String received;
+        try {
+            send("Connected as " + username + ". Use message>client 0 or logout.");
+        } catch (IOException e) {
+            Server.active.remove(this);
+            try { socket.close(); } catch (IOException ignored) {}
+            return;
+        }
 		while(true){
 			try{ 
 				received = input.readUTF(); // get message
@@ -92,27 +88,38 @@ class clientHandler implements Runnable{
 				}
 
 				//splits the message into the message and the recipient
-				StringTokenizer split = new StringTokenizer(received, '>');
-				String sentMsg = split.nextToken();
-				String recipient = split.nextToken();
+				StringTokenizer split = new StringTokenizer(received, ">");
+				if (split.countTokens() != 2) { send("Use: message>client 0"); continue; }
+                String sentMsg = split.nextToken().trim();
+				String recipient = split.nextToken().trim();
+                boolean found = false;
 
 				//look for the recipient in active users
-				for (clientHandler handler : Server.active){
+				for (clientHandler handler : Server.active.toArray(new clientHandler[0])){
 					if(handler.username.equals(recipient) && handler.loggedIn == true){
-						handler.output.writeUTF(this.username + " : " + sentMsg);
+						synchronized (handler.output) {
+                            handler.output.writeUTF(this.username + " : " + sentMsg);
+                            handler.output.flush();
+                            found = true;
+                        }
 						break;
 					}
 				}
+                if (!found) { send("Recipient not connected: " + recipient); }
 			}catch (IOException e){
 				e.printStackTrace();
+                break;
 			}
 	}
+        this.loggedIn = false;
+        Server.active.remove(this);
 		try{
 			//close everything
+            this.socket.close();
 			this.input.close();
 			this.output.close();
 		}catch(IOException e){
-			e.printStackTrace():
+			e.printStackTrace();
 		}
 	}
 }			
