@@ -1,29 +1,79 @@
 package client;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
+import java.net.*;
+import java.io.*;
 
 import model.Message;
 import observers.Observer;
 
 public class Client implements Observer {
-    public static void main(String[] args) throws Exception {
+//tylissa: updated to account for multithread
 
-        Socket socket = new Socket("localhost", 5000);
 
-        PrintWriter output = new PrintWriter(
-            socket.getOutputStream(), true);
 
-        BufferedReader keyboard = new BufferedReader(
-            new InputStreamReader(System.in));
+public static void main(String[] args) throws Exception, UnknownHostException, IOException {
+			String host = args.length > 0 ? args[0] : "localhost";
 
-        String message;
-        while ((message = keyboard.readLine()) != null) {
-            output.println(message);
-        }
+			Socket socket = new Socket(host, 5000);
 
-        socket.close();
+		BufferedReader keyboard = new BufferedReader(
+				new InputStreamReader(System.in));
+
+		//i/o streams
+		DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+		DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+
+	//send message thread
+	Thread sendMsg = new Thread(new Runnable()
+	{
+		@Override
+		public void run() {
+			while (true) {
+				try {
+					String msg = keyboard.readLine();
+					if (msg == null) {
+						break;
+					}
+					outputStream.writeUTF(msg);
+					outputStream.flush();
+					if (msg.equals("logout")) {
+						break;
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+					break;
+				}
+			}
+			try {
+				socket.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	});
+
+	//receive message thread
+	Thread readMsg = new Thread(new Runnable()
+	{
+		@Override
+		public void run(){
+			while (true){
+				try{
+					//read sent message
+					String msg = inputStream.readUTF();
+					System.out.println(msg);
+				}catch (IOException e){
+					if (!socket.isClosed() && !(e instanceof EOFException)) {
+						e.printStackTrace();
+					}
+					break;
+				}
+			}
+		}
+	});
+
+	sendMsg.setDaemon(true);
+	sendMsg.start();
+	readMsg.start();
     }
 
 // overrides for Subject Observer (Tylissa)
