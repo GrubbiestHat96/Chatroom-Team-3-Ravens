@@ -1,57 +1,70 @@
-
 package ui;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.util.HashMap;
-import java.util.Map;
-
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.awt.event.ActionListener;
 
 public class ChatWindow extends JFrame {
 
-    // Colors for our dark chat interface
+    // Colors for our dark chat window
     private final Color background = new Color(10, 10, 10);
-    private final Color panelColor = new Color(20, 20, 20);
     private final Color messageColor = new Color(49, 49, 49);
     private final Color textColor = new Color(235, 235, 235);
 
-    // Main components used in the chat window
-    private final JPanel messagesPanel;
-    private final JTextField messageField;
-    private final JLabel chatTitle;
-    private final Map<String, StringBuilder> chatHistory = new HashMap<>();
+    // List starts empty until we get real users from the server
+    private final DefaultListModel<String> conversationModel = new DefaultListModel<>();
+    private final JList<String> conversationList = new JList<>(conversationModel);
 
-    private String currentChat = "Team Chat";
+    // Components used to display and send messages
+    private final JPanel messagesPanel = new JPanel();
+    private final JTextField messageField = new JTextField();
+    private final JButton sendButton = new JButton("➤");
+    private final JLabel chatTitle = new JLabel("Select a chat");
+    private final JLabel statusLabel = new JLabel("Not connected");
+    private final JScrollPane messageScroll;
+
+    // Keep messages separate for each conversation while the app is open
+    private final Map<String, List<ChatLine>> chatHistory = new HashMap<>();
+
+    // The controller registers the Send button and handles its clicks
+    private boolean connected = false;
+    private String myUsername;
+
+    // Store the message and whether it was sent by us
+    private static class ChatLine {
+        final String sender;
+        final String text;
+        final boolean sentByMe;
+
+        ChatLine(String sender, String text, boolean sentByMe) {
+            this.sender = sender;
+            this.text = text;
+            this.sentByMe = sentByMe;
+        }
+    }
 
     public ChatWindow() {
 
-        // Set the window size and title
+        // Set up the main window
         setTitle("Navy Chatroom - Team 3 Ravens");
         setSize(900, 550);
         setMinimumSize(new Dimension(650, 400));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        // Main black background
-        JPanel mainPanel = new JPanel(new BorderLayout(20, 0));
+        JPanel mainPanel = new JPanel(new BorderLayout(20, 12));
         mainPanel.setBackground(background);
         mainPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
         setContentPane(mainPanel);
 
-        // Create the conversations panel on the left
+        // Left side for conversations
         JPanel sidebar = new JPanel(new BorderLayout(0, 15));
         sidebar.setBackground(background);
         sidebar.setPreferredSize(new Dimension(260, 0));
@@ -61,55 +74,44 @@ public class ChatWindow extends JFrame {
         sidebarTitle.setFont(new Font("Arial", Font.BOLD, 12));
         sidebar.add(sidebarTitle, BorderLayout.NORTH);
 
-        // Sample chats for testing the interface
-        String[] conversations = {"Team Chat", "Sailor A", "Sailor B"};
-
-        JList<String> conversationList = new JList<>(conversations);
         conversationList.setBackground(background);
         conversationList.setForeground(textColor);
-        conversationList.setFont(new Font("Arial", Font.BOLD, 15));
         conversationList.setSelectionBackground(messageColor);
         conversationList.setSelectionForeground(Color.WHITE);
+        conversationList.setFont(new Font("Arial", Font.BOLD, 15));
         conversationList.setFixedCellHeight(65);
-        conversationList.setBorder(null);
 
-        sidebar.add(new JScrollPane(conversationList), BorderLayout.CENTER);
+        JScrollPane conversationsScroll = new JScrollPane(conversationList);
+        conversationsScroll.setBorder(null);
+        sidebar.add(conversationsScroll, BorderLayout.CENTER);
         mainPanel.add(sidebar, BorderLayout.WEST);
 
-        // Create the chat section on the right
+        // Right side for the selected chat
         JPanel chatPanel = new JPanel(new BorderLayout(0, 20));
         chatPanel.setBackground(background);
 
-        chatTitle = new JLabel(currentChat);
         chatTitle.setForeground(textColor);
         chatTitle.setFont(new Font("Arial", Font.BOLD, 17));
-
         chatPanel.add(chatTitle, BorderLayout.NORTH);
 
-        // Panel where messages will be displayed
-        messagesPanel = new JPanel();
-        messagesPanel.setLayout(
-                new BoxLayout(messagesPanel, BoxLayout.Y_AXIS)
-        );
+        messagesPanel.setLayout(new BoxLayout(messagesPanel, BoxLayout.Y_AXIS));
         messagesPanel.setBackground(background);
 
-        JScrollPane messageScroll = new JScrollPane(messagesPanel);
+        messageScroll = new JScrollPane(messagesPanel);
         messageScroll.setBorder(null);
         messageScroll.getViewport().setBackground(background);
         chatPanel.add(messageScroll, BorderLayout.CENTER);
 
-        // Bottom panel containing the message box
+        // Bottom input field and Send button
         JPanel inputPanel = new JPanel(new BorderLayout(5, 0));
         inputPanel.setBackground(background);
 
-        messageField = new JTextField();
         messageField.setBackground(messageColor);
         messageField.setForeground(textColor);
         messageField.setCaretColor(Color.WHITE);
         messageField.setFont(new Font("Arial", Font.PLAIN, 14));
         messageField.setBorder(new EmptyBorder(12, 12, 12, 12));
 
-        JButton sendButton = new JButton("➤");
         sendButton.setBackground(messageColor);
         sendButton.setForeground(textColor);
         sendButton.setFocusPainted(false);
@@ -117,102 +119,192 @@ public class ChatWindow extends JFrame {
 
         inputPanel.add(messageField, BorderLayout.CENTER);
         inputPanel.add(sendButton, BorderLayout.EAST);
-
         chatPanel.add(inputPanel, BorderLayout.SOUTH);
         mainPanel.add(chatPanel, BorderLayout.CENTER);
 
-        // Add sample messages so we can see the layout
-        chatHistory.put("Team Chat",
-                new StringBuilder(
-                        "Sailor A: Is everyone connected?\n" +
-                        "You: Yes, ready!\n"
-                )
-        );
+        // Status shows the connection and assigned username
+        statusLabel.setForeground(Color.LIGHT_GRAY);
+        statusLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        mainPanel.add(statusLabel, BorderLayout.SOUTH);
 
-        // Show the Team Chat when the window opens
-        conversationList.setSelectedIndex(0);
-        showChat(currentChat);
-
-        // Change the conversation when a user selects another chat
+        // Change the messages when a different chat is selected
         conversationList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
-                currentChat = conversationList.getSelectedValue();
-                if (currentChat != null) {
-                    showChat(currentChat);
-                }
+                showChat(conversationList.getSelectedValue());
+                updateSendButton();
             }
         });
 
-        // Send messages by clicking the button or pressing Enter
-        sendButton.addActionListener(e -> sendMessage());
-        messageField.addActionListener(e -> sendMessage());
+        // The controller will register the Send button and Enter key
+        updateSendButton();
     }
 
-    // Display messages from the selected conversation
-    private void showChat(String chatName) {
+    // Give the controller the actual Send button to register
+    public JButton getSendButton() {
+        return sendButton;
+    }
 
-        chatTitle.setText(chatName);
+    // Pressing Enter should do the same thing as clicking Send
+    public void registerEnterAction(ActionListener listener) {
+        messageField.setActionCommand("SEND");
+        messageField.addActionListener(listener);
+    }
+
+    // Read the conversation selected in the list
+    public String getSelectedRecipient() {
+        return conversationList.getSelectedValue();
+    }
+
+    // Read the message that was typed
+    public String getMessageText() {
+        return messageField.getText().trim();
+    }
+
+    // Update the connection status shown at the bottom
+    public void setConnectionStatus(String status, boolean isConnected) {
+        connected = isConnected;
+        statusLabel.setText(status);
+        updateSendButton();
+    }
+
+    // This username comes from the server after connecting
+    public void setMyUsername(String username) {
+        myUsername = username;
+    }
+
+    // TODO: server.ClientHandler has an active list but it doesn't send that list
+    // to the clients yet. Call this method once that server feature is ready.
+    public void setConnectedUsers(List<String> usernames) {
+        String selected = conversationList.getSelectedValue();
+        conversationModel.clear();
+
+        for (String username : usernames) {
+            if (username != null && !username.isBlank()
+                    && !username.equals(myUsername)
+                    && !conversationModel.contains(username)) {
+                conversationModel.addElement(username);
+            }
+        }
+
+        if (selected != null && conversationModel.contains(selected)) {
+            conversationList.setSelectedValue(selected, true);
+        } else {
+            conversationList.clearSelection();
+            showChat(null);
+        }
+        updateSendButton();
+    }
+
+    // Add a real conversation when a message arrives from that user
+    public void addConversation(String username) {
+        if (username == null || username.isBlank() || username.equals(myUsername)) {
+            return;
+        }
+        if (!conversationModel.contains(username)) {
+            conversationModel.addElement(username);
+        }
+    }
+
+    // Called by the controller after the message was written to the socket
+    public void addSentMessage(String recipient, String text) {
+        saveMessage(recipient, new ChatLine(myUsername, text, true));
+    }
+
+    // Called by the controller when a message arrives from the server
+    public void addReceivedMessage(String sender, String text) {
+        addConversation(sender);
+        saveMessage(sender, new ChatLine(sender, text, false));
+    }
+
+    // Save a message in the right conversation
+    private void saveMessage(String chat, ChatLine line) {
+        chatHistory.computeIfAbsent(chat, name -> new ArrayList<>()).add(line);
+        if (chat.equals(conversationList.getSelectedValue())) {
+            showChat(chat);
+        }
+    }
+
+    // Draw messages for the selected conversation
+    private void showChat(String chat) {
+        chatTitle.setText(chat == null ? "Select a chat" : chat);
         messagesPanel.removeAll();
 
-        StringBuilder history = chatHistory.get(chatName);
-
-        if (history != null) {
-            for (String line : history.toString().split("\n")) {
-                if (line.isEmpty()) {
-                    continue;
-                }
-
-                boolean isSent = line.startsWith("You:");
-
+        if (chat != null) {
+            for (ChatLine line : chatHistory.getOrDefault(chat, List.of())) {
                 JPanel row = new JPanel(new FlowLayout(
-                        isSent ? FlowLayout.RIGHT : FlowLayout.LEFT
-                ));
+                        line.sentByMe ? FlowLayout.RIGHT : FlowLayout.LEFT, 6, 5));
                 row.setBackground(background);
 
-                JLabel messageLabel = new JLabel(line);
-                messageLabel.setOpaque(true);
-                messageLabel.setBackground(messageColor);
-                messageLabel.setForeground(textColor);
-                messageLabel.setBorder(
-                        new EmptyBorder(12, 12, 12, 12)
-                );
+                JPanel bubble = new JPanel(new BorderLayout(0, 4));
+                bubble.setBackground(messageColor);
+                bubble.setBorder(new EmptyBorder(10, 12, 10, 12));
 
-                row.add(messageLabel);
+                JLabel senderLabel = new JLabel(line.sentByMe ? "You" : line.sender);
+                senderLabel.setForeground(Color.LIGHT_GRAY);
+                senderLabel.setFont(new Font("Arial", Font.BOLD, 11));
+
+                JTextArea messageText = new JTextArea(line.text);
+                messageText.setColumns(28);
+                messageText.setLineWrap(true);
+                messageText.setWrapStyleWord(true);
+                messageText.setEditable(false);
+                messageText.setFocusable(false);
+                messageText.setForeground(textColor);
+                messageText.setBackground(messageColor);
+                messageText.setFont(new Font("Arial", Font.PLAIN, 13));
+                messageText.setBorder(null);
+
+                bubble.add(senderLabel, BorderLayout.NORTH);
+                bubble.add(messageText, BorderLayout.CENTER);
+                row.add(bubble);
+                row.setMaximumSize(new Dimension(Integer.MAX_VALUE,
+                        bubble.getPreferredSize().height + 10));
                 messagesPanel.add(row);
             }
         }
 
-        // Refresh the messages when switching conversations
         messagesPanel.revalidate();
         messagesPanel.repaint();
+        SwingUtilities.invokeLater(() -> {
+            JScrollBar bar = messageScroll.getVerticalScrollBar();
+            bar.setValue(bar.getMaximum());
+        });
     }
 
-    // Add a new message to the selected conversation
-    private void sendMessage() {
-
-        String text = messageField.getText().trim();
-
-        if (!text.isEmpty()) {
-
-            chatHistory.putIfAbsent(
-                    currentChat, new StringBuilder()
-            );
-
-            chatHistory.get(currentChat)
-                    .append("You: ")
-                    .append(text)
-                    .append("\n");
-
+    // Clear input after the controller reports the socket write succeeded
+    public void clearMessageIfUnchanged(String text) {
+        if (messageField.getText().trim().equals(text)) {
             messageField.setText("");
-            showChat(currentChat);
         }
     }
 
-    // Start the Java Swing application
+    // Keep sending disabled until connected and a conversation is selected
+    private void updateSendButton() {
+        boolean enabled = connected && conversationList.getSelectedValue() != null;
+        messageField.setEnabled(enabled);
+        sendButton.setEnabled(enabled);
+    }
+
+    // TODO: Group chats
+    // TODO: Login and Create Account screens are being made by TA
+    // TODO: Chat history here is temporary until DatabaseManager is implemented
+
     public static void main(String[] args) {
+        String host = args.length > 0 ? args[0] : "localhost";
+
         SwingUtilities.invokeLater(() -> {
             ChatWindow window = new ChatWindow();
+            Controller controller = new Controller(window);
+
+            window.addWindowListener(new WindowAdapter() {
+                @Override
+                public void windowClosing(WindowEvent e) {
+                    controller.disconnect();
+                }
+            });
+
             window.setVisible(true);
+            controller.connect(host, 5000);
         });
     }
 }
